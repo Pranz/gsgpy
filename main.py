@@ -12,7 +12,7 @@ CWD = os.getcwd()
 FONT_DIR = os.path.abspath(CWD + "/fonts")
 DATA_DIR = os.path.abspath(CWD + "/data")
 
-FONT     = "arial12x12.png"
+FONT     = "terminal12x12_gs_ro.png"
 
 SCREEN_WIDTH  = 80
 SCREEN_HEIGHT = 60
@@ -20,7 +20,7 @@ SCREEN_HEIGHT = 60
 COLOR_TEXT = libtcod.Color(255,255,255)
 
 if __name__ == "__main__":
-	libtcod.console_set_custom_font(FONT_DIR + "/" + FONT, libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_TCOD)
+	libtcod.console_set_custom_font(FONT_DIR + "/" + FONT, libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_ASCII_INROW)
 	libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, "TownRPG", False)
 	
 	game.init_game()
