@@ -5,8 +5,8 @@ import libtcodpy as libtcod
 import main
 import math
 
-MAP_WIDTH  = 50
-MAP_HEIGHT = 50
+MAP_WIDTH  = 70
+MAP_HEIGHT = 70
 REGION_WIDTH  = 16
 REGION_HEIGHT = 16
 OVERVIEW_SCREEN_WIDTH  = 30
@@ -17,7 +17,8 @@ WATER_THRESHOLD = 0.0
 TREELINE        = 0.26
 
 RIVER_EROSION = 0.002
-RIVERLAKES = 90
+RIVERLAKES = 200
+RIVERLEVEL = WATER_THRESHOLD - 0.01
 
 class Tile():
 	#Smallest unit of land there is. Has a height. belongs to region
@@ -98,7 +99,7 @@ def initialize(self):
 				height = self.world[mapX][mapY].tiles[regX][regY].height
 			except IndexError:
 				return False
-			self.world[mapX][mapY].tiles[regX][regY].height = WATER_THRESHOLD - 0.01
+			self.world[mapX][mapY].tiles[regX][regY].height = RIVERLEVEL
 			if height > min_height or height < WATER_THRESHOLD:
 				return False
 			for x in (-1,1):
@@ -123,7 +124,7 @@ def render(self):
 	for x in range(0, OVERVIEW_SCREEN_WIDTH):
 		for y in range(0, OVERVIEW_SCREEN_HEIGHT):
 			#height = self.world[self.cameraX + x][self.cameraY + y].average_height
-			draw_region(x,y,self.world[self.cameraX+x][self.cameraY+y],self.overview_con)
+			draw_region(x,y,self.world[self.cameraX+x][self.cameraY+y].average_height,self.world[self.cameraX+x][self.cameraY+y].biome,self.overview_con)
 			#if height < WATER_THRESHOLD:
 			#	libtcod.console_put_char_ex(self.overview_con, x,y, '~', libtcod.lighter_blue * (height * 1.5 + 1), libtcod.blue * (height *1.5 + 1))
 			#elif height >= WATER_THRESHOLD and height < TREELINE:
@@ -136,15 +137,7 @@ def render(self):
 	#draw region map
 	for x in range(0,REGION_WIDTH):
 		for y in range(0,REGION_HEIGHT):
-			height = self.world[self.cursorX][self.cursorY].tiles[x][y].height
-			libtcod.console_put_char_ex(self.region_con,x,y, ' ',libtcod.white, libtcod.Color(int(height*255),int(height*255),int(height*255)))
-			if height < WATER_THRESHOLD:
-				libtcod.console_put_char_ex(self.region_con, x,y, '~', libtcod.lighter_blue * (height * 1.5 + 1), libtcod.blue * (height *1.5 + 1))
-			elif height >= WATER_THRESHOLD and height < TREELINE:
-				libtcod.console_put_char_ex(self.region_con,x,y, chr(33),libtcod.green * (height*-1.5+ 1),libtcod.dark_green * (height*-1.5 + 1))
-			elif height >= TREELINE:
-				libtcod.console_put_char_ex(self.region_con, x,y, '^', libtcod.light_grey, libtcod.dark_grey)
-			
+			draw_tile(x,y,self.world[self.cursorX][self.cursorY].tiles[x][y].height,self.world[self.cursorX][self.cursorY].biome,self.region_con)
 
 	#debug text
 	libtcod.console_print(self.debug_con,0,0,"cursorX: " + str(self.cursorX))
@@ -154,6 +147,7 @@ def render(self):
 	libtcod.console_print(self.debug_con,0,4,"temperature: " + str(self.world[self.cursorX][self.cursorY].temperature))
 	libtcod.console_print(self.debug_con,0,5,"rainfall:    " + str(self.world[self.cursorX][self.cursorY].rainfall))
 	libtcod.console_print(self.debug_con,0,6,"biome: " + self.world[self.cursorX][self.cursorY].biome)
+	libtcod.console_print(self.debug_con,0,7,"avg.height: " + str(self.world[self.cursorX][self.cursorY].average_height))
 
 
 	libtcod.console_blit(self.debug_con,0, 0, 0, 0, 0, 0, OVERVIEW_SCREEN_HEIGHT + 1)
@@ -193,19 +187,39 @@ def gen_rainfall_map(seed, scale, octaves=1,persistence=0.5):
 	return lambda x,y: noise.pnoise2(scale * (x + seed), scale * (y + seed),octaves,persistence,2.5)
 
 def gen_temperature_map(seed,scale,mapY,octaves=1,persistence=0.5):
-	return lambda x,y: noise.pnoise2(scale * (x + seed), scale * (y + seed),octaves,persistence,2.5)*30 - (abs(y - (mapY / 2.0)) * (75.0 / mapY)) + 32
+	return lambda x,y: noise.pnoise2(scale * (x + seed), scale * (y + seed),octaves,persistence,2.5)*50 - (abs(y - (mapY / 2.0)) * (60.0 / mapY)) + 36
 
-def draw_region(x,y,region,con):
-	if region.biome == "ocean":
-		libtcod.console_put_char_ex(con, x,y, '~', libtcod.lighter_blue * (region.average_height * 1.5 + 1), libtcod.blue * (region.average_height *1.5 + 1))
-	elif region.biome == "mountain":
+def draw_region(x,y,height,biome,con):
+	if biome == "ocean":
+		libtcod.console_put_char_ex(con, x,y, '~', libtcod.lighter_blue * (height * 1.5 + 1), libtcod.blue * (height *1.5 + 1))
+	elif biome == "mountain":
 		libtcod.console_put_char_ex(con, x,y, '^', libtcod.light_grey, libtcod.dark_grey)
-	elif region.biome == "boreal forest":
+	elif biome == "boreal forest":
 		libtcod.console_put_char_ex(con, x,y, chr(157), libtcod.dark_green, libtcod.darkest_green)
-	elif region.biome == "tundra":
+	elif biome == "tundra":
 		libtcod.console_put_char_ex(con, x,y, chr(177), libtcod.lighter_sky, libtcod.sky)
-	elif region.biome == "temperate grassland":
-		libtcod.console_put_char_ex(con, x,y, chr(176), libtcod.light_amber, libtcod.desaturated_amber)
+	elif biome == "temperate grassland":
+		libtcod.console_put_char_ex(con, x,y, chr(176), libtcod.green, libtcod.desaturated_chartreuse)
+	elif biome == "woodland":
+		libtcod.console_put_char_ex(con, x,y, chr(244), libtcod.darker_chartreuse,libtcod.dark_chartreuse)
+	elif biome == "temperate forest":
+		libtcod.console_put_char_ex(con, x,y, chr(237), libtcod.darkest_yellow, libtcod.dark_green * 0.8)
+	elif biome == "tropical forest":
+		libtcod.console_put_char_ex(con, x,y, chr(186), libtcod.dark_sea,libtcod.darkest_sea)
+	elif biome == "tropical rainforest":
+		libtcod.console_put_char_ex(con, x,y, chr(215), libtcod.dark_sea * 0.8, libtcod.darkest_sea)
+	elif biome == "desert":
+		libtcod.console_put_char_ex(con, x,y, chr(177), libtcod.light_yellow, libtcod.dark_yellow)
 	else:
 		libtcod.console_put_char_ex(con, x,y, 'a', libtcod.white, libtcod.black)
+
+def draw_tile(x,y,height,biome,con):
+	if height < WATER_THRESHOLD:
+		libtcod.console_put_char_ex(con, x,y, '~', libtcod.lighter_blue * (height * 1.5 + 1), libtcod.blue * (height *1.5 + 1))
+	elif height <= TREELINE and biome not in ("ocean","mountain"):
+		draw_region(x,y,height,biome,con)
+	elif height > TREELINE:
+		libtcod.console_put_char_ex(con, x,y, '^', libtcod.light_grey, libtcod.dark_grey)
+	else:
+		libtcod.console_put_char_ex(con, x,y, chr(178),libtcod.light_green,libtcod.darker_green)
 
